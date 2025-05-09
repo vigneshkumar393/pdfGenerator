@@ -1,6 +1,7 @@
 package com.mayvel.myHistoryDB;
 
 import com.mayvel.myHistoryDB.component.SNBaseComponent;
+import com.mayvel.myHistoryDB.utils.Generic;
 import com.mayvel.myHistoryDB.utils.Logger;
 import com.tridium.json.JSONObject;
 
@@ -88,9 +89,8 @@ public class BSNGroup extends BComponent implements SNBaseComponent {
   public void started() throws Exception {
     super.started();
     Logger.Log("BSNGroup started");
-    checkHistoryUpdates(); // Register listener once
+    checkHistoryUpdates();
   }
-
 
   @Override
     public void stopped() throws Exception {
@@ -121,30 +121,56 @@ public class BSNGroup extends BComponent implements SNBaseComponent {
 
                       BIHistory history = (BIHistory) ord.resolve().get();
                       Logger.Log("2  History resolved successfully");
-
                       BHistoryConfig config = history.getConfig();
+
                       BHistoryId historyId = config.getId();
 
                         if (!bHistoryEvent.getHistoryId().equals(historyId) || getHistorySource().isEmpty()) return;
+                        Logger.Log("3  History resolved successfully");
                         String rawRecord = bHistoryEvent.getRecordSet().getLastRecord().toString();
-
                         try {
-                            JSONObject logJson = new JSONObject();
+                            setOut(rawRecord);
+                            Logger.Log("5 Table fetched: " + rawRecord);
+                            Logger.Log("6 Table fetched: " + bHistoryEvent.getRecordSet().getLastRecord());
+                            Logger.Log("7 getName: " + bHistoryEvent.getRecordSet().getLastRecord().getName());
+                            Logger.Log("8 getType: " + bHistoryEvent.getRecordSet().getLastRecord().getType());
+                            Logger.Log("9 getType: " + bHistoryEvent.getRecordSet().getLastRecord().getSchema());
 
-                            // Split by comma
-                            String[] parts = rawRecord.split(",");
+                            BHistoryRecord record = bHistoryEvent.getRecordSet().getLastRecord();
+                            BHistorySchema schema = record.getSchema();
+                            String schemaStr = schema.toString();
+                            Logger.Log("9 Schema: " + schemaStr);
+                            // Create a JSON object to store the schema and values
+                            JSONObject jsonObject = new JSONObject();
 
-                            for (String part : parts) {
-                                String[] keyValue = part.split("=", 2); // split only on first '='
+                            // Split the schema to get field names
+                            String[] fields = schemaStr.split(";");
+                            for (String field : fields) {
+                                String[] keyValue = field.split(",", 2);
                                 if (keyValue.length == 2) {
-                                    logJson.put(keyValue[0].trim(), keyValue[1].trim());
+                                    String key = keyValue[0].trim();
+                                    String type = keyValue[1].trim();
+
+                                    try {
+                                        BValue value = record.get(key);
+                                        if (value != null) {
+                                            jsonObject.put(key, value.toString());  // Store key-value pair in JSON object
+                                            Logger.Log("10 Field: " + key + " => Type: " + type + " => Value: " + value.toString());
+                                        } else {
+                                            jsonObject.put(key, "null");  // If value is null, store "null"
+                                            Logger.Log("10 Field: " + key + " => Type: " + type + " => Value: null");
+                                        }
+                                    } catch (Exception e) {
+                                        Logger.Log("Error reading value for field '" + key + "': " + e.getMessage());
+                                    }
                                 } else {
-                                    logJson.put("info", part.trim()); // fallback if no '='
+                                    Logger.Log("Malformed schema field: " + field);
                                 }
                             }
 
-                            Logger.Log("10 Table fetched: " + logJson.toString(2));
-                            setOut(rawRecord);
+                            // Convert the JSON object to string and set it as the result
+                            setOut(jsonObject.toString(2));  // Pretty print with indentation level 2
+                            Logger.Log("11 Final JSON Object: " + jsonObject.toString(2));  // Log the final JSON object
                         } catch (Exception e) {
                             setOut("Error parsing history event: \" + e.getMessage()");
                             Logger.Log("Error parsing history event: " + e.getMessage());
