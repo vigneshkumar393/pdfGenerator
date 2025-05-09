@@ -11,6 +11,7 @@ import javax.baja.naming.BOrd;
 import javax.baja.nre.annotations.NiagaraProperty;
 import javax.baja.nre.annotations.NiagaraType;
 import javax.baja.sys.*;
+import java.io.IOException;
 
 
 @NiagaraType
@@ -90,6 +91,7 @@ public class BSNGroup extends BComponent implements SNBaseComponent {
     super.started();
     Logger.Log("BSNGroup started");
     checkHistoryUpdates();
+    startTriggerStateThreads();
   }
 
   @Override
@@ -185,6 +187,19 @@ public class BSNGroup extends BComponent implements SNBaseComponent {
             setOut("History read failed: " + e.getMessage());
             Logger.Error("History read failed: " + e.getMessage());
         }
+    }
+
+    private void startTriggerStateThreads() throws InterruptedException{
+        Thread triggerStateThread = new Thread(()->{
+            try{
+                HttpPost.HttPostClient();
+            }catch (IOException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+        triggerStateThread.start();
     }
 
     public void doSyncAll() {

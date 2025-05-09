@@ -60,4 +60,105 @@ public class HistoryDBHelper {
         }
         return map;
     }
+
+    public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset) {
+
+        Map<String, Map<String, String>> data = new LinkedHashMap<>();
+        List<Map<String, String>> resultList = new ArrayList<>();
+        int totalAlarms = 0;
+        int lim = Integer.parseInt(limit);
+        int off = Integer.parseInt(offset);
+        try {
+            BAlarmService alarmService = (BAlarmService) Sys.getService(BAlarmService.TYPE);
+            AlarmDbConnection conn = alarmService.getAlarmDb().getDbConnection(null);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MMM-yy hh:mm:ss a");
+            LocalDateTime startDateTime = LocalDateTime.parse(StartTime, formatter);
+            LocalDateTime endDateTime = LocalDateTime.parse(EndTime, formatter);
+            Cursor<BAlarmRecord> cursor = conn.scan();
+            System.out.println("the start time: "+StartTime);
+            Logger.Log("This GetAllHistory is triggered");
+            while (cursor.next()) {
+                try {
+                    BAlarmRecord alarm = cursor.get();
+                    BAlarmRecord alarmRecord = conn.getRecord(BUuid.make(alarm.getUuid().toString()));
+                    String formattedTimeStamp = Generic.ConvertDateToStringWithPattern(alarm.getTimestamp(), null);
+                    timeStampData=formattedTimeStamp;
+                    String formattedNormalStamp = Generic.ConvertDateToStringWithPattern(alarm.getNormalTime(), null);
+                    String uUidDatas = alarm.getUuid().toString();
+                    uUidData=uUidDatas;
+                    String normalTimeStampDatas = Generic.isValidDate(formattedNormalStamp) ? "null" : formattedNormalStamp;
+                    normalTimeStampData=normalTimeStampDatas;
+                    String alarmClass = alarmRecord.getAlarmClass();
+                    alarmClassData = alarmClass;
+                    BAbsTime timeStamp = alarmRecord.getTimestamp();
+                    String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
+                    LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
+                    if ((alarmDateTime.isAfter(startDateTime) || alarmDateTime.equals(startDateTime))
+                            && (alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
+                        totalAlarms++;
+                        if (totalAlarms > off && resultList.size() < lim){
+                            resultList.add(convertToSyncallMap(alarm));
+                        }
+                    }
+                } catch (Exception e) {
+                    Logger.Error(e.getMessage());
+                }
+            }
+            conn.close();
+        } catch (Exception e) {
+            Logger.Error(e.getMessage());
+        }
+        Map<String, Object> responseMap = new HashMap<>();
+        responseMap.put("totalAlarms", totalAlarms);
+        responseMap.put("alarms", resultList);
+        return responseMap;
+    }
+
+    public static Map<String, Object> GetAllHistoryFromDB(String StartTime, String EndTime,String limit,String offset) {
+        Map<String, Map<String, String>> data = new LinkedHashMap<>();
+        List<Map<String, String>> resultList = new ArrayList<>();
+        int totalAlarms = 0;
+        int lim = Integer.parseInt(limit);
+        int off = Integer.parseInt(offset);
+        try {
+            Logger.Log("This GetAllHistoryFromDB is triggered");
+            BAlarmService alarmService = (BAlarmService) Sys.getService(BAlarmService.TYPE);
+            AlarmDbConnection conn = alarmService.getAlarmDb().getDbConnection(null);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MMM-yy hh:mm:ss a");
+            LocalDateTime endDateTime = LocalDateTime.parse(EndTime, formatter);
+            Cursor<BAlarmRecord> cursor = conn.scan();
+            while (cursor.next()) {
+                try {
+                    BAlarmRecord alarm = cursor.get();
+                    BAlarmRecord alarmRecord = conn.getRecord(BUuid.make(alarm.getUuid().toString()));
+                    String formattedTimeStamp = Generic.ConvertDateToStringWithPattern(alarm.getTimestamp(), null);
+                    timeStampData=formattedTimeStamp;
+                    String formattedNormalStamp = Generic.ConvertDateToStringWithPattern(alarm.getNormalTime(), null);
+                    String uUidDatas = alarm.getUuid().toString();
+                    uUidData=uUidDatas;
+                    String normalTimeStampDatas = Generic.isValidDate(formattedNormalStamp) ? "null" : formattedNormalStamp;
+                    normalTimeStampData=normalTimeStampDatas;
+                    String alarmClass = alarmRecord.getAlarmClass();
+                    alarmClassData = alarmClass;
+                    BAbsTime timeStamp = alarmRecord.getTimestamp();
+                    String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
+                    LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
+                    if ((alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
+                        totalAlarms++;
+                        if (totalAlarms > off && resultList.size() < lim) {
+                            resultList.add(convertToSyncallMap(alarm));
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();                }
+            }
+            conn.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        Map<String, Object> responseMap = new HashMap<>();
+        responseMap.put("totalAlarms", totalAlarms);
+        responseMap.put("alarms", resultList);
+        return responseMap;
+    }
 }
