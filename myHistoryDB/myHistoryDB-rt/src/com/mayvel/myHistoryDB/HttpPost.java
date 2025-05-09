@@ -43,12 +43,15 @@ public class HttpPost {
 
             String StarTime = jsonBody.optString("startTime","");
             String EndTime = jsonBody.optString("endTime","");
+            String historySourcePath = jsonBody.optString("historySourcePath","");
 
             Map<String, Object> responseMap;
             if(StarTime==""){
-                responseMap=  HistoryDBHelper.GetAllHistoryFromDB(StarTime,EndTime,limit,offset);
+                Logger.Log("11 GetAllHistoryFromDB log");
+                responseMap=  HistoryDBHelper.GetAllHistoryFromDB(StarTime,EndTime,limit,offset,historySourcePath);
             }else{
-                responseMap = HistoryDBHelper.GetAllHistory(StarTime,EndTime,limit,offset);
+                Logger.Log("11 GetAllHistory log");
+                responseMap = HistoryDBHelper.GetAllHistory(StarTime,EndTime,limit,offset,historySourcePath);
             }
 
             JSONObject jsonResponse = new JSONObject(responseMap);

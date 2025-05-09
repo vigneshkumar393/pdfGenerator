@@ -3,13 +3,12 @@ import com.mayvel.myHistoryDB.utils.Generic;
 import com.mayvel.myHistoryDB.utils.Logger;
 import com.tridium.alarm.BConsoleRecipient;
 
-import javax.baja.alarm.AlarmDbConnection;
 import javax.baja.alarm.BAlarmRecord;
-import javax.baja.alarm.BAlarmService;
-import javax.baja.sys.BAbsTime;
-import javax.baja.sys.Cursor;
-import javax.baja.sys.Sys;
-import javax.baja.util.BUuid;
+import javax.baja.history.*;
+import javax.baja.history.db.BHistoryDatabase;
+import javax.baja.history.db.HistoryDatabaseConnection;
+import javax.baja.naming.BOrd;
+import javax.baja.sys.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -24,17 +23,36 @@ public class HistoryDBHelper {
     public static String normalTimeStampData;
     public static String uUidData;
 
-    public static Map<String, String> convertToSyncallMap(BAlarmRecord alarm) {
+    public static Map<String, String> convertToSyncallMap(BHistoryRecord record) {
         Map<String, String> mapData = new HashMap<>();
 
         // Parsing alarm data
-        String alarmDataString = alarm.getAlarmData().toString();
-        Map<String, String> alarmDataMap = parseData(alarmDataString);
-        mapData.putAll(alarmDataMap);
-        mapData.put("timeStampData", timeStampData);
-        mapData.put("normalTime", normalTimeStampData);
-        mapData.put("alarmClass", alarmClassData);
-        mapData.put("uuid", uUidData);
+        BHistorySchema schema = record.getSchema();
+        String schemaStr = schema.toString();
+        // Split the schema to get field names
+        String[] fields = schemaStr.split(";");
+        for (String field : fields) {
+            String[] keyValue = field.split(",", 2);
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String type = keyValue[1].trim();
+
+                try {
+                    BValue value = record.get(key);
+                    if (value != null) {
+                        mapData.put(key, value.toString());
+                        Logger.Log("10 Field: " + key + " => Type: " + type + " => Value: " + value.toString());
+                    } else {
+                        mapData.put(key, "null");
+                        Logger.Log("10 Field: " + key + " => Type: " + type + " => Value: null");
+                    }
+                } catch (Exception e) {
+                    Logger.Log("Error reading value for field '" + key + "': " + e.getMessage());
+                }
+            } else {
+                Logger.Log("Malformed schema field: " + field);
+            }
+        }
         return mapData;
     }
 
@@ -61,104 +79,164 @@ public class HistoryDBHelper {
         return map;
     }
 
-    public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset) {
-
-        Map<String, Map<String, String>> data = new LinkedHashMap<>();
+    public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset, String historySource) {
+        Map<String, Object> responseMap = new HashMap<>();
         List<Map<String, String>> resultList = new ArrayList<>();
-        int totalAlarms = 0;
         int lim = Integer.parseInt(limit);
         int off = Integer.parseInt(offset);
+        int totalRecords = 0;
+        StringBuilder historyGrp = new StringBuilder();
         try {
-            BAlarmService alarmService = (BAlarmService) Sys.getService(BAlarmService.TYPE);
-            AlarmDbConnection conn = alarmService.getAlarmDb().getDbConnection(null);
+            BHistoryService historyService = (BHistoryService) Sys.getService(BHistoryService.TYPE);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MMM-yy hh:mm:ss a");
             LocalDateTime startDateTime = LocalDateTime.parse(StartTime, formatter);
             LocalDateTime endDateTime = LocalDateTime.parse(EndTime, formatter);
-            Cursor<BAlarmRecord> cursor = conn.scan();
-            System.out.println("the start time: "+StartTime);
-            Logger.Log("This GetAllHistory is triggered");
-            while (cursor.next()) {
-                try {
-                    BAlarmRecord alarm = cursor.get();
-                    BAlarmRecord alarmRecord = conn.getRecord(BUuid.make(alarm.getUuid().toString()));
-                    String formattedTimeStamp = Generic.ConvertDateToStringWithPattern(alarm.getTimestamp(), null);
-                    timeStampData=formattedTimeStamp;
-                    String formattedNormalStamp = Generic.ConvertDateToStringWithPattern(alarm.getNormalTime(), null);
-                    String uUidDatas = alarm.getUuid().toString();
-                    uUidData=uUidDatas;
-                    String normalTimeStampDatas = Generic.isValidDate(formattedNormalStamp) ? "null" : formattedNormalStamp;
-                    normalTimeStampData=normalTimeStampDatas;
-                    String alarmClass = alarmRecord.getAlarmClass();
-                    alarmClassData = alarmClass;
-                    BAbsTime timeStamp = alarmRecord.getTimestamp();
-                    String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
-                    LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
-                    if ((alarmDateTime.isAfter(startDateTime) || alarmDateTime.equals(startDateTime))
-                            && (alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
-                        totalAlarms++;
-                        if (totalAlarms > off && resultList.size() < lim){
-                            resultList.add(convertToSyncallMap(alarm));
+
+            if (historyService == null) {
+                Logger.Error("History service not available");
+                responseMap.put("error", "History service not available");
+                return responseMap;
+            }
+
+            BHistoryDatabase db = historyService.getDatabase();
+            String path = historySource;
+            BOrd ord = BOrd.make(path);
+
+            BIHistory history = (BIHistory) ord.resolve().get();
+            Logger.Log("2  History resolved successfully");
+            BHistoryConfig config = history.getConfig();
+            db.setConfig(config);
+            BHistoryId historyId = config.getId();
+            db.getSystemTable(String.valueOf(historyId));
+            Logger.Log("3  History resolved successfully");
+            BIHistory[] tablesRecord = db.getHistories();
+
+            for (int i = 0; i < tablesRecord.length; i++) {
+                BIHistory hist = tablesRecord[i];
+                historyGrp.append(hist.getId().toString());
+                if (i < tablesRecord.length - 1) {
+                    historyGrp.append(", ");
+                }
+
+                // Check for the /NetCool/TestPoint01 table
+                if (hist.getId().toString().equals(extractPath(historySource))) {
+                    HistoryDatabaseConnection conn = historyService.getDatabase().getDbConnection(null);
+                    Cursor<BHistoryRecord> cursor = conn.scan(hist);
+                    while (cursor.next()) {
+                        try {
+                            BHistoryRecord record = cursor.get();
+                            BAbsTime timeStamp = record.getTimestamp();
+                            String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
+                            LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
+                            if ((alarmDateTime.isAfter(startDateTime) || alarmDateTime.equals(startDateTime))
+                                    && (alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
+                                totalRecords++;
+                                if (totalRecords > off && resultList.size() < lim){
+                                    resultList.add(convertToSyncallMap(record));
+                                }
+                            }
+                        } catch (Exception e) {
+                            Logger.Error(e.getMessage());
                         }
                     }
-                } catch (Exception e) {
-                    Logger.Error(e.getMessage());
+                    conn.close();
                 }
             }
-            conn.close();
+
         } catch (Exception e) {
-            Logger.Error(e.getMessage());
+            Logger.Error("Error in GetAllHistory: " + e.getMessage());
+            responseMap.put("error", e.getMessage());
+            return responseMap;
         }
-        Map<String, Object> responseMap = new HashMap<>();
-        responseMap.put("totalAlarms", totalAlarms);
-        responseMap.put("alarms", resultList);
+
+        responseMap.put("totalHistoryRecords", totalRecords);
+        responseMap.put("historyRecords", resultList);
+        responseMap.put("historySourcePath", historySource);
         return responseMap;
     }
 
-    public static Map<String, Object> GetAllHistoryFromDB(String StartTime, String EndTime,String limit,String offset) {
+    private static String extractPath(String input) {
+        if (input == null || !input.contains(":")) {
+            return input; // or return null;
+        }
+
+        // Split the string by colon
+        String[] parts = input.split(":", 2);
+        return parts[1]; // This will be "/NetCool/TestPoint01"
+    }
+
+    public static Map<String, Object> GetAllHistoryFromDB(String StartTime, String EndTime, String limit, String offset, String historySource) {
         Map<String, Map<String, String>> data = new LinkedHashMap<>();
         List<Map<String, String>> resultList = new ArrayList<>();
-        int totalAlarms = 0;
+        Map<String, Object> responseMap = new HashMap<>();
+        int totalRecords = 0;
         int lim = Integer.parseInt(limit);
         int off = Integer.parseInt(offset);
+        StringBuilder historyGrp = new StringBuilder();
         try {
-            Logger.Log("This GetAllHistoryFromDB is triggered");
-            BAlarmService alarmService = (BAlarmService) Sys.getService(BAlarmService.TYPE);
-            AlarmDbConnection conn = alarmService.getAlarmDb().getDbConnection(null);
+            BHistoryService historyService = (BHistoryService) Sys.getService(BHistoryService.TYPE);
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MMM-yy hh:mm:ss a");
             LocalDateTime endDateTime = LocalDateTime.parse(EndTime, formatter);
-            Cursor<BAlarmRecord> cursor = conn.scan();
-            while (cursor.next()) {
-                try {
-                    BAlarmRecord alarm = cursor.get();
-                    BAlarmRecord alarmRecord = conn.getRecord(BUuid.make(alarm.getUuid().toString()));
-                    String formattedTimeStamp = Generic.ConvertDateToStringWithPattern(alarm.getTimestamp(), null);
-                    timeStampData=formattedTimeStamp;
-                    String formattedNormalStamp = Generic.ConvertDateToStringWithPattern(alarm.getNormalTime(), null);
-                    String uUidDatas = alarm.getUuid().toString();
-                    uUidData=uUidDatas;
-                    String normalTimeStampDatas = Generic.isValidDate(formattedNormalStamp) ? "null" : formattedNormalStamp;
-                    normalTimeStampData=normalTimeStampDatas;
-                    String alarmClass = alarmRecord.getAlarmClass();
-                    alarmClassData = alarmClass;
-                    BAbsTime timeStamp = alarmRecord.getTimestamp();
-                    String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
-                    LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
-                    if ((alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
-                        totalAlarms++;
-                        if (totalAlarms > off && resultList.size() < lim) {
-                            resultList.add(convertToSyncallMap(alarm));
+
+            if (historyService == null) {
+                Logger.Error("History service not available");
+                responseMap.put("error", "History service not available");
+                return responseMap;
+            }
+
+            BHistoryDatabase db = historyService.getDatabase();
+            String path = historySource;
+            BOrd ord = BOrd.make(path);
+
+            BIHistory history = (BIHistory) ord.resolve().get();
+            Logger.Log("2  History resolved successfully");
+            BHistoryConfig config = history.getConfig();
+            db.setConfig(config);
+            BHistoryId historyId = config.getId();
+            db.getSystemTable(String.valueOf(historyId));
+            Logger.Log("3  History resolved successfully");
+            BIHistory[] tablesRecord = db.getHistories();
+
+            for (int i = 0; i < tablesRecord.length; i++) {
+                BIHistory hist = tablesRecord[i];
+                historyGrp.append(hist.getId().toString());
+                if (i < tablesRecord.length - 1) {
+                    historyGrp.append(", ");
+                }
+
+                // Check for the /NetCool/TestPoint01 table
+                if (hist.getId().toString().equals(extractPath(historySource))) {
+                    HistoryDatabaseConnection conn = historyService.getDatabase().getDbConnection(null);
+                    Cursor<BHistoryRecord> cursor = conn.scan(hist);
+                    while (cursor.next()) {
+                        try {
+                            BHistoryRecord record = cursor.get();
+                            BAbsTime timeStamp = record.getTimestamp();
+                            String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
+                            LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
+                            if ((alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
+                                totalRecords++;
+                                if (totalRecords > off && resultList.size() < lim){
+                                    resultList.add(convertToSyncallMap(record));
+                                }
+                            }
+                        } catch (Exception e) {
+                            Logger.Error(e.getMessage());
                         }
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();                }
+                    conn.close();
+                }
             }
-            conn.close();
+
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.Error("Error in GetAllHistory: " + e.getMessage());
+            responseMap.put("error", e.getMessage());
+            return responseMap;
         }
-        Map<String, Object> responseMap = new HashMap<>();
-        responseMap.put("totalAlarms", totalAlarms);
-        responseMap.put("alarms", resultList);
+
+        responseMap.put("totalHistoryRecords", totalRecords);
+        responseMap.put("historyRecords", resultList);
+        responseMap.put("historySourcePath", historySource);
         return responseMap;
     }
 }
