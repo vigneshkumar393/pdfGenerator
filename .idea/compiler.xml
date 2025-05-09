@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <option name="niagara.module.root" value="E:\Niagara\Vignesh\modules\myHistoryDB\myHistoryDB\myHistoryDB-rt" />
+        <option name="niagara.test.roots" value="srcTest=java" />
+        <processorPath useClasspath="false">
+          <entry name="C:/Niagara/Niagara-4.14.0.162/bin/ext/nre.jar" />
+        </processorPath>
+        <module name="myHistoryDB.myHistoryDB-rt.main" />
+        <module name="myHistoryDB.myHistoryDB-rt.moduleTest" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel target="1.8">
+      <module name="myAlarmDB.myHistoryDB-rt.main" target="8" />
+      <module name="myAlarmDB.myHistoryDB-rt.moduleTest" target="8" />
+      <module name="myAlarmDB.myHistoryDB-rt.test" target="8" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
