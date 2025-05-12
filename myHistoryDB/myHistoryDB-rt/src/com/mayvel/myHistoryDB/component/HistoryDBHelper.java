@@ -23,8 +23,16 @@ public class HistoryDBHelper {
     public static String normalTimeStampData;
     public static String uUidData;
 
-    public static Map<String, String> convertToSyncallMap(BHistoryRecord record) {
+    public static Map<String, String> convertToSyncallMap(BHistoryRecord record, String filterValues) {
         Map<String, String> mapData = new HashMap<>();
+
+        // Convert comma-separated filterValues to a Set
+        Set<String> filterKeys = new HashSet<>();
+        if (filterValues != null && !filterValues.trim().isEmpty()) {
+            for (String key : filterValues.split(",")) {
+                filterKeys.add(key.trim());
+            }
+        }
 
         // Parsing alarm data
         BHistorySchema schema = record.getSchema();
@@ -36,6 +44,11 @@ public class HistoryDBHelper {
             if (keyValue.length == 2) {
                 String key = keyValue[0].trim();
                 String type = keyValue[1].trim();
+
+                // Filter logic
+                if (!filterKeys.isEmpty() && !filterKeys.contains(key)) {
+                    continue; // skip fields not in the filter
+                }
 
                 try {
                     BValue value = record.get(key);
@@ -79,7 +92,7 @@ public class HistoryDBHelper {
         return map;
     }
 
-    public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset, String historySource) {
+    public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset, String historySource, String filterValues) {
         Map<String, Object> responseMap = new HashMap<>();
         List<Map<String, String>> resultList = new ArrayList<>();
         int lim = Integer.parseInt(limit);
@@ -132,7 +145,7 @@ public class HistoryDBHelper {
                                     && (alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
                                 totalRecords++;
                                 if (totalRecords > off && resultList.size() < lim){
-                                    resultList.add(convertToSyncallMap(record));
+                                    resultList.add(convertToSyncallMap(record,filterValues));
                                 }
                             }
                         } catch (Exception e) {
@@ -152,6 +165,7 @@ public class HistoryDBHelper {
         responseMap.put("totalHistoryRecords", totalRecords);
         responseMap.put("historyRecords", resultList);
         responseMap.put("historySourcePath", historySource);
+        responseMap.put("filterValues", filterValues);
         return responseMap;
     }
 
@@ -165,7 +179,7 @@ public class HistoryDBHelper {
         return parts[1]; // This will be "/NetCool/TestPoint01"
     }
 
-    public static Map<String, Object> GetAllHistoryFromDB(String StartTime, String EndTime, String limit, String offset, String historySource) {
+    public static Map<String, Object> GetAllHistoryFromDB(String StartTime, String EndTime, String limit, String offset, String historySource, String filterValues) {
         Map<String, Map<String, String>> data = new LinkedHashMap<>();
         List<Map<String, String>> resultList = new ArrayList<>();
         Map<String, Object> responseMap = new HashMap<>();
@@ -217,7 +231,7 @@ public class HistoryDBHelper {
                             if ((alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
                                 totalRecords++;
                                 if (totalRecords > off && resultList.size() < lim){
-                                    resultList.add(convertToSyncallMap(record));
+                                    resultList.add(convertToSyncallMap(record,filterValues));
                                 }
                             }
                         } catch (Exception e) {
@@ -237,6 +251,7 @@ public class HistoryDBHelper {
         responseMap.put("totalHistoryRecords", totalRecords);
         responseMap.put("historyRecords", resultList);
         responseMap.put("historySourcePath", historySource);
+        responseMap.put("filterValues", filterValues);
         return responseMap;
     }
 }

@@ -37,6 +37,7 @@ public class HttpPost {
             Map<String,String> queryParams = parseQuery(query);
             String limit = queryParams.get("limit");
             String offset = queryParams.get("offset");
+            String filterValues = queryParams.get("filterValues");
             byte[] bytes = readFully(is);
             String requestBody = new String(bytes, StandardCharsets.UTF_8);
             JSONObject jsonBody = new JSONObject(requestBody);
@@ -48,10 +49,10 @@ public class HttpPost {
             Map<String, Object> responseMap;
             if(StarTime==""){
                 Logger.Log("11 GetAllHistoryFromDB log");
-                responseMap=  HistoryDBHelper.GetAllHistoryFromDB(StarTime,EndTime,limit,offset,historySourcePath);
+                responseMap=  HistoryDBHelper.GetAllHistoryFromDB(StarTime,EndTime,limit,offset,historySourcePath,filterValues);
             }else{
                 Logger.Log("11 GetAllHistory log");
-                responseMap = HistoryDBHelper.GetAllHistory(StarTime,EndTime,limit,offset,historySourcePath);
+                responseMap = HistoryDBHelper.GetAllHistory(StarTime,EndTime,limit,offset,historySourcePath,filterValues);
             }
 
             JSONObject jsonResponse = new JSONObject(responseMap);
