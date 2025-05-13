@@ -95,9 +95,10 @@ public class HistoryDBHelper {
     public static Map<String, Object> GetAllHistory(String StartTime, String EndTime, String limit, String offset, String historySource, String filterValues) {
         Map<String, Object> responseMap = new HashMap<>();
         List<Map<String, String>> resultList = new ArrayList<>();
-        int lim = Integer.parseInt(limit);
-        int off = Integer.parseInt(offset);
+        //int lim = Integer.parseInt(limit);
+        //int off = Integer.parseInt(offset);
         int totalRecords = 0;
+        int totalScanned = 0;
         StringBuilder historyGrp = new StringBuilder();
         try {
             BHistoryService historyService = (BHistoryService) Sys.getService(BHistoryService.TYPE);
@@ -137,6 +138,7 @@ public class HistoryDBHelper {
                     Cursor<BHistoryRecord> cursor = conn.scan(hist);
                     while (cursor.next()) {
                         try {
+                            totalScanned++;
                             BHistoryRecord record = cursor.get();
                             BAbsTime timeStamp = record.getTimestamp();
                             String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
@@ -144,9 +146,9 @@ public class HistoryDBHelper {
                             if ((alarmDateTime.isAfter(startDateTime) || alarmDateTime.equals(startDateTime))
                                     && (alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
                                 totalRecords++;
-                                if (totalRecords > off && resultList.size() < lim){
+                                //if (totalRecords > off && resultList.size() < lim){
                                     resultList.add(convertToSyncallMap(record,filterValues));
-                                }
+                                //}
                             }
                         } catch (Exception e) {
                             Logger.Error(e.getMessage());
@@ -162,8 +164,9 @@ public class HistoryDBHelper {
             return responseMap;
         }
 
-        responseMap.put("totalHistoryRecords", totalRecords);
+        responseMap.put("filteredRecordCount", totalRecords);
         responseMap.put("historyRecords", resultList);
+        responseMap.put("totalDatabaseRecordCount", totalScanned);
         responseMap.put("historySourcePath", historySource);
         responseMap.put("filterValues", filterValues);
         return responseMap;
@@ -184,8 +187,9 @@ public class HistoryDBHelper {
         List<Map<String, String>> resultList = new ArrayList<>();
         Map<String, Object> responseMap = new HashMap<>();
         int totalRecords = 0;
-        int lim = Integer.parseInt(limit);
-        int off = Integer.parseInt(offset);
+        int totalScanned = 0;
+       // int lim = Integer.parseInt(limit);
+       // int off = Integer.parseInt(offset);
         StringBuilder historyGrp = new StringBuilder();
         try {
             BHistoryService historyService = (BHistoryService) Sys.getService(BHistoryService.TYPE);
@@ -224,15 +228,16 @@ public class HistoryDBHelper {
                     Cursor<BHistoryRecord> cursor = conn.scan(hist);
                     while (cursor.next()) {
                         try {
+                            totalScanned++;
                             BHistoryRecord record = cursor.get();
                             BAbsTime timeStamp = record.getTimestamp();
                             String formattedTimeStampValue = Generic.formatTimeStamp(timeStamp);;
                             LocalDateTime alarmDateTime = LocalDateTime.parse(formattedTimeStampValue, formatter);
                             if ((alarmDateTime.isBefore(endDateTime) || alarmDateTime.equals(endDateTime))) {
                                 totalRecords++;
-                                if (totalRecords > off && resultList.size() < lim){
+                               // if (totalRecords > off && resultList.size() < lim){
                                     resultList.add(convertToSyncallMap(record,filterValues));
-                                }
+                              //  }
                             }
                         } catch (Exception e) {
                             Logger.Error(e.getMessage());
@@ -248,8 +253,9 @@ public class HistoryDBHelper {
             return responseMap;
         }
 
-        responseMap.put("totalHistoryRecords", totalRecords);
+        responseMap.put("filteredRecordCount", totalRecords);
         responseMap.put("historyRecords", resultList);
+        responseMap.put("totalDatabaseRecordCount", totalScanned);
         responseMap.put("historySourcePath", historySource);
         responseMap.put("filterValues", filterValues);
         return responseMap;
