@@ -131,4 +131,4 @@ configure<MultiProjectExtension> {
   findProjects()
 }
 
-rootProject.name = "myHistoryDB"
+rootProject.name = "pdfGenerator"

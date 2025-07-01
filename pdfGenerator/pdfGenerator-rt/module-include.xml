@@ -1,0 +1,13 @@
+<types>
+  <!--com.shloklabs.netcool-->
+  <type class="com.mayvel.pdfGenerator.BMyHistoryDBDevice" name="MyHistoryDBDevice"/>
+  <type class="com.mayvel.pdfGenerator.BMyHistoryDBDeviceFolder" name="MyHistoryDBDeviceFolder"/>
+  <type class="com.mayvel.pdfGenerator.BMyHistoryDBNetwork" name="MyHistoryDBNetwork"/>
+  <type class="com.mayvel.pdfGenerator.BSNGroup" name="SNGroup"/>
+  <!--com.shloklabs.netcool.point-->
+  <type class="com.mayvel.pdfGenerator.point.BMyHistoryDBPointDeviceExt" name="MyHistoryDBPointDeviceExt"/>
+  <type class="com.mayvel.pdfGenerator.point.BMyHistoryDBPointFolder" name="MyHistoryDBPointFolder"/>
+  <type class="com.mayvel.pdfGenerator.point.BMyHistoryDBProxyExt" name="MyHistoryDBProxyExt"/>
+  <type class="com.mayvel.pdfGenerator.point.BMyHistoryDBPointDiscoveryLeaf" name="MyHistoryDBPointDiscoveryLeaf"/>
+  <type class="com.mayvel.pdfGenerator.point.BMyHistoryDBPointDiscoveryPreferences" name="MyHistoryDBPointDiscoveryPreferences"/>
+</types>
